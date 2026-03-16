@@ -107,15 +107,25 @@ export async function POST(request: Request) {
     extractedSources.push(await extractFromPastedText(parsedPayload.pastedText));
   }
 
-  for (const file of parsedPayload.files) {
-    try {
-      const extracted = await extractFromFile(file);
-      if (!extracted.extractedText) {
-        return badRequest(`Could not extract readable text from "${file.name}".`);
-      }
+  // Run extraction in small batches to speed up multi-file OCR/PDF parsing without overloading provider rate limits.
+  const extractionBatchSize = 2;
+  for (let start = 0; start < parsedPayload.files.length; start += extractionBatchSize) {
+    const batch = parsedPayload.files.slice(start, start + extractionBatchSize);
+    const batchResults = await Promise.all(
+      batch.map(async (file) => {
+        try {
+          const extracted = await extractFromFile(file);
+          if (!extracted.extractedText) {
+            throw new Error(`Could not extract readable text from "${file.name}".`);
+          }
+          return extracted;
+        } catch (error) {
+          throw new Error(error instanceof Error ? error.message : `Failed processing "${file.name}".`);
+        }
+      })
+    );
+    for (const extracted of batchResults) {
       extractedSources.push(extracted);
-    } catch (error) {
-      return badRequest(error instanceof Error ? error.message : `Failed processing "${file.name}".`);
     }
   }
 

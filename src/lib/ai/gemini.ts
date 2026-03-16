@@ -114,6 +114,8 @@ async function createOpenAIResponse(params: {
   model: string;
   input: unknown;
   temperature?: number;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
 }): Promise<OpenAIResponsePayload> {
   const { apiKey, apiBase } = requireOpenAIConfig();
   const body: Record<string, unknown> = {
@@ -124,16 +126,34 @@ async function createOpenAIResponse(params: {
   if (typeof params.temperature === "number") {
     body.temperature = params.temperature;
   }
+  if (typeof params.maxOutputTokens === "number") {
+    body.max_output_tokens = params.maxOutputTokens;
+  }
 
-  const response = await fetch(`${apiBase}/responses`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body),
-    cache: "no-store"
-  });
+  const timeoutMs = Math.max(15_000, params.timeoutMs ?? 90_000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}/responses`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`OpenAI request timed out after ${timeoutMs}ms.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
@@ -173,7 +193,9 @@ export async function extractTextFromImageWithGemini(params: {
               }
             ]
           }
-        ]
+        ],
+        maxOutputTokens: 8_000,
+        timeoutMs: 90_000
       });
       const text = extractResponseText(response);
       if (!text) {
@@ -210,6 +232,8 @@ type StructuredGenerationOptions = {
   temperature?: number;
   maxRetries?: number;
   model?: string;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
 };
 
 function formatZodPath(path: Array<string | number>): string {
@@ -263,7 +287,9 @@ export async function generateStructuredWithGemini<T>(
               ]
             }
           ],
-          temperature: options.temperature ?? 0.2
+          temperature: options.temperature ?? 0.2,
+          maxOutputTokens: options.maxOutputTokens,
+          timeoutMs: options.timeoutMs
         });
         const rawText = extractResponseText(response);
         const json = parseModelJson(rawText);

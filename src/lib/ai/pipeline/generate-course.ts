@@ -101,12 +101,40 @@ async function generateStage<T>(stage: GenerationStage, schema: z.ZodSchema<T>, 
   try {
     return await generateStructuredWithGemini(schema, prompt, {
       temperature: 0.2,
-      maxRetries: 3
+      maxRetries: 2,
+      timeoutMs: 90_000,
+      maxOutputTokens:
+        stage === "summary"
+          ? 1_500
+          : stage === "guide"
+            ? 3_500
+            : stage === "terms"
+              ? 2_500
+              : stage === "flashcards"
+                ? 3_500
+                : stage === "quiz"
+                  ? 3_500
+                  : stage === "practice"
+                    ? 3_000
+                    : 1_500
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown AI generation error";
     throw new StageError(stage, message);
   }
+}
+
+async function generateTimedStage<T>(
+  stage: GenerationStage,
+  schema: z.ZodSchema<T>,
+  prompt: string
+): Promise<{ value: T; elapsedMs: number }> {
+  const startedAt = Date.now();
+  const value = await generateStage(stage, schema, prompt);
+  return {
+    value,
+    elapsedMs: Date.now() - startedAt
+  };
 }
 
 async function persistArtifacts(params: {
@@ -265,6 +293,7 @@ async function persistArtifacts(params: {
 export async function runCourseGenerationPipeline(params: RunCourseGenerationParams): Promise<RunCourseGenerationResult> {
   const admin = createSupabaseAdminClient();
   const startedAt = Date.now();
+  const stageDurations: Partial<Record<GenerationStage, number>> = {};
 
   const { data: course, error: courseError } = await admin
     .from("courses")
@@ -337,27 +366,38 @@ export async function runCourseGenerationPipeline(params: RunCourseGenerationPar
       sourceContext
     };
 
-    const summary = await generateStage("summary", generatedSummarySchema, buildSummaryPrompt(promptParams));
-    const guide = await generateStage("guide", generatedGuideSchema, buildGuidePrompt(promptParams));
-    const terms = await generateStage("terms", generatedTermsSchema, buildTermsPrompt(promptParams));
-    const flashcards = await generateStage(
-      "flashcards",
-      generatedFlashcardsSchema,
-      buildFlashcardsPrompt(promptParams)
-    );
-    const quiz = await generateStage("quiz", generatedQuizSchema, buildQuizPrompt(promptParams));
-    const practice = await generateStage("practice", generatedPracticeSchema, buildPracticePrompt(promptParams));
-    const tips = await generateStage("tips", generatedStudyTipsSchema, buildTipsPrompt(promptParams));
+    const [summaryTimed, guideTimed] = await Promise.all([
+      generateTimedStage("summary", generatedSummarySchema, buildSummaryPrompt(promptParams)),
+      generateTimedStage("guide", generatedGuideSchema, buildGuidePrompt(promptParams))
+    ]);
+    stageDurations.summary = summaryTimed.elapsedMs;
+    stageDurations.guide = guideTimed.elapsedMs;
+
+    const [termsTimed, flashcardsTimed] = await Promise.all([
+      generateTimedStage("terms", generatedTermsSchema, buildTermsPrompt(promptParams)),
+      generateTimedStage("flashcards", generatedFlashcardsSchema, buildFlashcardsPrompt(promptParams))
+    ]);
+    stageDurations.terms = termsTimed.elapsedMs;
+    stageDurations.flashcards = flashcardsTimed.elapsedMs;
+
+    const [quizTimed, practiceTimed, tipsTimed] = await Promise.all([
+      generateTimedStage("quiz", generatedQuizSchema, buildQuizPrompt(promptParams)),
+      generateTimedStage("practice", generatedPracticeSchema, buildPracticePrompt(promptParams)),
+      generateTimedStage("tips", generatedStudyTipsSchema, buildTipsPrompt(promptParams))
+    ]);
+    stageDurations.quiz = quizTimed.elapsedMs;
+    stageDurations.practice = practiceTimed.elapsedMs;
+    stageDurations.tips = tipsTimed.elapsedMs;
 
     const persistedCounts = await persistArtifacts({
       courseId: params.courseId,
-      summary,
-      guide,
-      terms,
-      flashcards,
-      quiz,
-      practice,
-      tips
+      summary: summaryTimed.value,
+      guide: guideTimed.value,
+      terms: termsTimed.value,
+      flashcards: flashcardsTimed.value,
+      quiz: quizTimed.value,
+      practice: practiceTimed.value,
+      tips: tipsTimed.value
     });
 
     const metadata = {
@@ -365,6 +405,7 @@ export async function runCourseGenerationPipeline(params: RunCourseGenerationPar
       elapsedMs: Date.now() - startedAt,
       sourceChars: sourceText.length,
       contextChars: sourceContext.length,
+      stageDurationsMs: stageDurations,
       ...persistedCounts
     };
 
@@ -390,7 +431,8 @@ export async function runCourseGenerationPipeline(params: RunCourseGenerationPar
     const stage = error instanceof StageError ? error.stage : "unknown";
     const failureMetadata = {
       stage,
-      elapsedMs: Date.now() - startedAt
+      elapsedMs: Date.now() - startedAt,
+      stageDurationsMs: stageDurations
     };
 
     await markGenerationJobFailed(params.jobId, message, failureMetadata);
