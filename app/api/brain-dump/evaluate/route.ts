@@ -8,6 +8,9 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { brainDumpEvaluateRequestSchema } from "@/schemas/api/voice";
 import { brainDumpEvaluationSchema } from "@/schemas/ai/voice";
 
+export const runtime = "nodejs";
+export const maxDuration = 90;
+
 export async function POST(request: Request) {
   const { user, supabase } = await getRouteUser();
   if (!user) {

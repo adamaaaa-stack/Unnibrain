@@ -1,6 +1,7 @@
 export const INGESTION_LIMITS = {
   maxFiles: 10,
-  maxFileSizeBytes: 10 * 1024 * 1024,
+  maxFileSizeBytes: 4 * 1024 * 1024,
+  maxTotalUploadBytes: 4 * 1024 * 1024,
   maxTotalExtractedChars: 220_000,
   minTotalExtractedChars: 120
 } as const;

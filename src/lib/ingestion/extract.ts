@@ -41,6 +41,7 @@ export function validateFiles(files: File[]): void {
     throw new Error(`You can upload up to ${INGESTION_LIMITS.maxFiles} files per course.`);
   }
 
+  let totalBytes = 0;
   for (const file of files) {
     const mimeType = detectMimeType(file);
     if (!ALLOWED_MIME_TYPES.has(mimeType)) {
@@ -52,6 +53,13 @@ export function validateFiles(files: File[]): void {
     if (file.size > INGESTION_LIMITS.maxFileSizeBytes) {
       throw new Error(`"${file.name}" exceeds ${Math.round(INGESTION_LIMITS.maxFileSizeBytes / (1024 * 1024))}MB.`);
     }
+    totalBytes += file.size;
+  }
+
+  if (totalBytes > INGESTION_LIMITS.maxTotalUploadBytes) {
+    throw new Error(
+      `Total upload size exceeds ${Math.round(INGESTION_LIMITS.maxTotalUploadBytes / (1024 * 1024))}MB for this deployment target.`
+    );
   }
 }
 

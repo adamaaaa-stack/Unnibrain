@@ -7,6 +7,9 @@ import { badRequest, forbidden, ok, tooManyRequests, unauthorized } from "@/lib/
 import { tutorResponseSchema, type TutorResponse } from "@/schemas/ai/tutor";
 import { tutorChatRequestSchema, tutorChatResponseSchema } from "@/schemas/api/tutor";
 
+export const runtime = "nodejs";
+export const maxDuration = 90;
+
 const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 const MAX_USER_MESSAGES_PER_WINDOW = 18;
 

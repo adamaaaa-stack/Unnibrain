@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 
 const ACCEPTED_TYPES = ".txt,.md,application/pdf,image/png,image/jpeg,image/webp,image/heic,image/heif";
 const MAX_FILES = 10;
+const MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024;
+const MAX_TOTAL_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 type Stage = "idle" | "validating" | "uploading" | "extracting" | "finalizing" | "generating";
 
@@ -47,7 +49,27 @@ export function CreateCourseForm() {
   }, [stage]);
 
   function applyFiles(incoming: FileList | File[]) {
-    const next = [...files, ...Array.from(incoming)].slice(0, MAX_FILES);
+    const merged = [...files, ...Array.from(incoming)];
+    if (merged.length > MAX_FILES) {
+      setError(`You can upload up to ${MAX_FILES} files per course.`);
+      return;
+    }
+
+    for (const file of merged) {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setError(`"${file.name}" exceeds ${Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB.`);
+        return;
+      }
+    }
+
+    const totalBytes = merged.reduce((sum, file) => sum + file.size, 0);
+    if (totalBytes > MAX_TOTAL_UPLOAD_BYTES) {
+      setError(`Total upload size exceeds ${Math.round(MAX_TOTAL_UPLOAD_BYTES / (1024 * 1024))}MB.`);
+      return;
+    }
+
+    setError(null);
+    const next = merged.slice(0, MAX_FILES);
     setFiles(next);
   }
 
@@ -68,6 +90,10 @@ export function CreateCourseForm() {
       }
       if (!pastedText.trim() && files.length === 0) {
         throw new Error("Add pasted notes or upload at least one file.");
+      }
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      if (totalBytes > MAX_TOTAL_UPLOAD_BYTES) {
+        throw new Error(`Total upload size exceeds ${Math.round(MAX_TOTAL_UPLOAD_BYTES / (1024 * 1024))}MB.`);
       }
 
       const body = new FormData();
@@ -193,7 +219,8 @@ export function CreateCourseForm() {
             isDragging ? "border-[var(--brand)] bg-blue-50" : "border-slate-300 bg-slate-50"
           }`}
         >
-          Drag and drop files here. Up to {MAX_FILES} files.
+          Drag and drop files here. Up to {MAX_FILES} files, {Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB per file,{" "}
+          {Math.round(MAX_TOTAL_UPLOAD_BYTES / (1024 * 1024))}MB total.
         </div>
         {files.length > 0 ? (
           <ul className="space-y-2">

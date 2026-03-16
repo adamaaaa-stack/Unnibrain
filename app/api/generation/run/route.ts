@@ -5,6 +5,9 @@ import { getEntitlementsForUser } from "@/lib/billing/entitlements";
 import { badRequest, forbidden, ok, unauthorized } from "@/lib/http/responses";
 import { runGenerationRequestSchema } from "@/schemas/api/course";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
   const { user, supabase } = await getRouteUser();
   if (!user) {

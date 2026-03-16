@@ -15,6 +15,9 @@ import { INGESTION_LIMITS, IMAGE_MIME_TYPES } from "@/lib/ingestion/constants";
 import { normalizeExtractedText } from "@/lib/ingestion/normalize";
 import { ensureCourseSourcesBucket, uploadCourseSourceFile } from "@/lib/storage/course-sources";
 
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
 type ParsedCreatePayload = {
   title: string;
   pastedText: string;

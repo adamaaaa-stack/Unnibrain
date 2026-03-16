@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { mapPayPalStatus, verifyWebhookSignature } from "@/lib/payments/paypal";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 type PayPalWebhookEvent = {
   event_type?: string;
   resource?: {

@@ -5,6 +5,9 @@ import { badRequest, ok, unauthorized } from "@/lib/http/responses";
 import { createProSubscription } from "@/lib/payments/paypal";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 export async function POST() {
   const { user } = await getRouteUser();
   if (!user) {
