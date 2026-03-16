@@ -1,0 +1,1 @@
+export const FREE_MONTHLY_COURSE_LIMIT = 3;
