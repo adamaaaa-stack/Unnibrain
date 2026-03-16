@@ -212,6 +212,26 @@ type StructuredGenerationOptions = {
   model?: string;
 };
 
+function formatZodPath(path: Array<string | number>): string {
+  if (path.length === 0) return "(root)";
+  return path.map((part) => String(part)).join(".");
+}
+
+function buildValidationRepairPrompt(basePrompt: string, issues: z.ZodIssue[]): string {
+  const lines = issues
+    .slice(0, 12)
+    .map((issue) => `- ${formatZodPath(issue.path)}: ${issue.message}`);
+
+  return `${basePrompt}
+
+CRITICAL: Your previous JSON failed schema validation.
+Regenerate the full JSON from scratch and satisfy all constraints exactly.
+Do not output partial JSON.
+
+Validation errors to fix:
+${lines.join("\n")}`;
+}
+
 export async function generateStructuredWithGemini<T>(
   schema: z.ZodSchema<T>,
   prompt: string,
@@ -227,6 +247,7 @@ export async function generateStructuredWithGemini<T>(
   let lastError: unknown;
 
   for (const modelName of models) {
+    let promptForAttempt = prompt;
     for (let attempt = 1; attempt <= retries; attempt += 1) {
       try {
         const response = await createOpenAIResponse({
@@ -237,7 +258,7 @@ export async function generateStructuredWithGemini<T>(
               content: [
                 {
                   type: "input_text",
-                  text: prompt
+                  text: promptForAttempt
                 }
               ]
             }
@@ -249,6 +270,10 @@ export async function generateStructuredWithGemini<T>(
         return schema.parse(json);
       } catch (error) {
         lastError = error;
+        if (error instanceof z.ZodError) {
+          promptForAttempt = buildValidationRepairPrompt(prompt, error.issues);
+          continue;
+        }
         if (isModelUnavailableError(error)) {
           break;
         }

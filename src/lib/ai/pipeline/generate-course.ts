@@ -101,7 +101,7 @@ async function generateStage<T>(stage: GenerationStage, schema: z.ZodSchema<T>, 
   try {
     return await generateStructuredWithGemini(schema, prompt, {
       temperature: 0.2,
-      maxRetries: 2
+      maxRetries: 3
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown AI generation error";

@@ -44,6 +44,11 @@ export function buildGuidePrompt(params: PromptParams): string {
   return withSource(
     params,
     `Create a structured study guide divided into sections.
+Hard output constraints:
+- Provide 4 to 10 sections (never fewer than 2).
+- Each section summary must be at least 60 characters.
+- Each section must include 3 to 6 bullets (never fewer than 2).
+- Bullets should be concise but specific.
 JSON shape:
 {
   "sections": [
