@@ -7,6 +7,7 @@ const publicEnvSchema = z.object({
 });
 
 const serverEnvSchema = publicEnvSchema.extend({
+  PAYMENTS_ENABLED: z.enum(["true", "false"]).default("false"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().min(1).optional(),
@@ -41,6 +42,7 @@ const rawServerEnv = {
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "public-anon-key-placeholder",
+  PAYMENTS_ENABLED: process.env.PAYMENTS_ENABLED,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   OPENAI_MODEL: process.env.OPENAI_MODEL,
@@ -61,6 +63,7 @@ export const serverEnv = parsedServerEnv.success
   ? parsedServerEnv.data
   : {
       ...publicEnv,
+      PAYMENTS_ENABLED: process.env.PAYMENTS_ENABLED === "true" ? "true" : "false",
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       OPENAI_MODEL: process.env.OPENAI_MODEL,

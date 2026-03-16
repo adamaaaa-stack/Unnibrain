@@ -1,6 +1,6 @@
 import { getRouteUser } from "@/lib/auth/route-user";
 import { getEntitlementsForUser } from "@/lib/billing/entitlements";
-import { publicEnv } from "@/lib/config/env";
+import { serverEnv, publicEnv } from "@/lib/config/env";
 import { badRequest, ok, unauthorized } from "@/lib/http/responses";
 import { createProSubscription } from "@/lib/payments/paypal";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -9,6 +9,10 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST() {
+  if (serverEnv.PAYMENTS_ENABLED !== "true") {
+    return badRequest("Payments are disabled in testing mode.");
+  }
+
   const { user } = await getRouteUser();
   if (!user) {
     return unauthorized();

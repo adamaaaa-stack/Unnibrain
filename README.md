@@ -30,6 +30,7 @@ npm run dev
 ## Required env vars
 
 - `NEXT_PUBLIC_APP_URL`
+- `PAYMENTS_ENABLED` (`false` for testing mode, `true` to enable live billing)
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -45,6 +46,8 @@ npm run dev
 - `PAYPAL_API_BASE` (`https://api-m.sandbox.paypal.com` for sandbox, `https://api-m.paypal.com` for live)
 
 ## PayPal subscription setup
+
+Set `PAYMENTS_ENABLED=true` before using this section.
 
 1. In PayPal Developer, create a Product and a Subscription Plan.
 2. Put the plan id (`P-...`) into `PAYPAL_PLAN_ID_PRO`.

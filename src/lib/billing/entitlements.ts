@@ -1,10 +1,25 @@
 import { FREE_MONTHLY_COURSE_LIMIT } from "@/lib/billing/constants";
+import { serverEnv } from "@/lib/config/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMonthKey, getNextMonthResetIso } from "@/lib/usage/month";
 import { entitlementSchema, type Entitlement } from "@/schemas/domain/entitlements";
 
 export async function getEntitlementsForUser(userId: string): Promise<Entitlement> {
+  const paymentsEnabled = serverEnv.PAYMENTS_ENABLED === "true";
+  if (!paymentsEnabled) {
+    return entitlementSchema.parse({
+      plan: "pro",
+      canGenerateCourse: true,
+      generationsUsedThisMonth: 0,
+      generationLimitThisMonth: null,
+      canUseBrainDump: true,
+      canUseSpeechRubric: true,
+      canUseTutor: true,
+      nextResetAt: getNextMonthResetIso()
+    });
+  }
+
   const supabase = createSupabaseServerClient();
   const monthKey = getMonthKey();
 
@@ -42,6 +57,10 @@ export async function getEntitlementsForUser(userId: string): Promise<Entitlemen
 }
 
 export async function incrementCourseGenerationUsage(userId: string): Promise<void> {
+  if (serverEnv.PAYMENTS_ENABLED !== "true") {
+    return;
+  }
+
   const supabase = createSupabaseAdminClient();
   const monthKey = getMonthKey();
 

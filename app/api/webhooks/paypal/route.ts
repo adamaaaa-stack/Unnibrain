@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { serverEnv } from "@/lib/config/env";
 import { mapPayPalStatus, verifyWebhookSignature } from "@/lib/payments/paypal";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -29,6 +30,10 @@ function toStatus(eventType?: string, resourceStatus?: string) {
 }
 
 export async function POST(request: Request) {
+  if (serverEnv.PAYMENTS_ENABLED !== "true") {
+    return NextResponse.json({ ok: true, ignored: true, reason: "payments_disabled" }, { status: 200 });
+  }
+
   const rawBody = await request.text();
 
   const verified = await verifyWebhookSignature({
