@@ -82,5 +82,5 @@ unibranni/
 ## Conventions
 - Route logic should remain thin; business logic belongs in `src/features` and `src/lib`.
 - Shared contracts are in `src/schemas` (Zod) and `src/types` (TypeScript).
-- Anything requiring secrets (Gemini, PayPal, privileged DB operations) stays server-only under `src/lib`.
+- Anything requiring secrets (OpenAI, PayPal, privileged DB operations) stays server-only under `src/lib`.
 - RLS-sensitive tables and policies live in `supabase/migrations`.

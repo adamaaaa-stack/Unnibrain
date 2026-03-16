@@ -104,7 +104,7 @@ async function generateStage<T>(stage: GenerationStage, schema: z.ZodSchema<T>, 
       maxRetries: 2
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Gemini generation error";
+    const message = error instanceof Error ? error.message : "Unknown AI generation error";
     throw new StageError(stage, message);
   }
 }

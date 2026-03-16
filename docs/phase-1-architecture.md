@@ -25,7 +25,7 @@ UniBrain is a mobile-first SaaS study platform where a student uploads notes (pa
 ## 4) System overview
 - Frontend: Next.js 14 App Router, TypeScript, Tailwind, selective client components.
 - Backend: Route handlers + server actions, Supabase Postgres/Auth/Storage.
-- AI: Gemini 1.5 Flash through server-only adapters with schema-enforced output.
+- AI: OpenAI GPT models through server-only adapters with schema-enforced output.
 - Billing: PayPal subscription + webhook synchronization into `subscriptions`.
 - Deployment: Vercel for app, Supabase managed backend.
 
@@ -99,7 +99,7 @@ UniBrain is a mobile-first SaaS study platform where a student uploads notes (pa
 - Integration tests begin in Phase 2 after auth/shell exist.
 
 ## 16) Deployment and cost-control notes
-- Keep Gemini calls server-side and batched by pipeline stage.
+- Keep OpenAI calls server-side and batched by pipeline stage.
 - Cap generated item counts to avoid runaway token usage.
 - Prefer incremental regeneration (single artifact) over full reruns when possible.
 - Vercel env vars and Supabase secrets must be explicitly versioned in `.env.example`.
