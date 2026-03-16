@@ -248,6 +248,64 @@ export default async function CoursePage({ params }: { params: { courseId: strin
         <StudyModeGrid courseId={course.id} availability={availability} lastStudiedMode={latestMode} />
       </div>
 
+      <div className="card-surface p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-[var(--font-heading)] text-lg font-semibold text-slate-900">Pro Modes</h2>
+            <p className="text-sm text-slate-600">Advanced speaking and tutoring workflows tied to this course.</p>
+          </div>
+          {entitlement.plan === "free" ? <PaywallModal featureName="Brain Dump, Speech Rubric, and AI Tutor" ctaLabel="Unlock Pro Modes" /> : null}
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              slug: "brain-dump",
+              label: "Brain Dump",
+              description: "Explain everything you remember and get concept coverage feedback.",
+              enabled: entitlement.canUseBrainDump
+            },
+            {
+              slug: "speech-rubric",
+              label: "Speech Rubric",
+              description: "Score clarity, structure, confidence, pacing, and filler words.",
+              enabled: entitlement.canUseSpeechRubric
+            },
+            {
+              slug: "tutor",
+              label: "AI Tutor",
+              description: "Course-grounded chat for explanations, quizzes, and mnemonics.",
+              enabled: entitlement.canUseTutor
+            }
+          ].map((mode) =>
+            mode.enabled ? (
+              <Link
+                key={mode.slug}
+                href={`/courses/${course.id}/${mode.slug}`}
+                className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-[var(--brand)] hover:shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-[var(--font-heading)] text-base font-semibold text-slate-900">{mode.label}</h3>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-emerald-700">Ready</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{mode.description}</p>
+              </Link>
+            ) : (
+              <div key={mode.slug} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-[var(--font-heading)] text-base font-semibold text-slate-900">{mode.label}</h3>
+                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold uppercase text-slate-600">Pro</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{mode.description}</p>
+                <div className="mt-3">
+                  <PaywallModal featureName={mode.label} />
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
       <FloatingTutorButton courseId={course.id} plan={entitlement.plan} />
     </section>
   );
