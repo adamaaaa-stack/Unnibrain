@@ -77,6 +77,7 @@ export async function POST(request: Request) {
       title: parsed.data.title,
       transcript: parsed.data.transcript,
       durationSeconds: parsed.data.durationSeconds,
+      audioMetrics: parsed.data.audioMetrics,
       courseTitle,
       courseContext
     });

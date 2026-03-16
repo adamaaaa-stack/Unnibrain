@@ -4,6 +4,14 @@ type SpeechRubricPromptParams = {
   durationSeconds?: number;
   courseTitle?: string;
   courseContext?: string;
+  audioMetrics?: {
+    avgRms: number;
+    peakRms: number;
+    silenceRatio: number;
+    clippingRatio: number;
+    speakingSegments: number;
+    estimatedWpm: number;
+  };
 };
 
 export function buildSpeechRubricEvaluationPrompt(params: SpeechRubricPromptParams): string {
@@ -13,13 +21,24 @@ export function buildSpeechRubricEvaluationPrompt(params: SpeechRubricPromptPara
       : "Estimated speaking duration (seconds): unavailable";
   const titleLine = params.title?.trim() || params.courseTitle?.trim() || "Untitled speech";
   const hasGrounding = Boolean(params.courseContext?.trim());
+  const hasAudioMetrics = Boolean(params.audioMetrics);
+  const audioMetricsBlock = hasAudioMetrics
+    ? `AUDIO METRICS (from microphone signal):
+- avgRms: ${params.audioMetrics!.avgRms.toFixed(4)} (overall loudness proxy, 0-1)
+- peakRms: ${params.audioMetrics!.peakRms.toFixed(4)} (peak loudness proxy, 0-1)
+- silenceRatio: ${params.audioMetrics!.silenceRatio.toFixed(4)} (fraction of silent frames, 0-1)
+- clippingRatio: ${params.audioMetrics!.clippingRatio.toFixed(4)} (possible clipping fraction, 0-1)
+- speakingSegments: ${params.audioMetrics!.speakingSegments} (start/stop speaking runs)
+- estimatedWpm: ${params.audioMetrics!.estimatedWpm}`
+    : "AUDIO METRICS: unavailable";
 
   return `
 You evaluate a student's spoken presentation transcript using a communication rubric.
 
 Rules:
 - Be honest about uncertainty when only transcript text is available.
-- Do not claim acoustic analysis (tone, volume, pronunciation) unless text evidence supports a weak inference.
+- When AUDIO METRICS are available, use them for volume control, pause balance, and pace consistency.
+- Do not claim accent/pronunciation details because raw audio is not provided.
 - Use transcript evidence for every score rationale.
 - Keep suggestions concrete and actionable.
 - Count filler words from transcript tokens (for example: "um", "uh", "like", "you know", "so", "basically") when used as fillers.
@@ -44,6 +63,7 @@ Output JSON shape:
 
 Speech title/topic: ${titleLine}
 ${durationLine}
+${audioMetricsBlock}
 
 ${hasGrounding ? `COURSE MATERIAL:\n"""${params.courseContext}"""` : "COURSE MATERIAL: not provided"}
 

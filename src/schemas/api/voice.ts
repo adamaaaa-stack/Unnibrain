@@ -38,6 +38,17 @@ const optionalDurationSecondsSchema = z.preprocess(
   z.number().int().min(1).max(3600).optional()
 );
 
+const speechAudioMetricsSchema = z
+  .object({
+    avgRms: z.number().min(0).max(1),
+    peakRms: z.number().min(0).max(1),
+    silenceRatio: z.number().min(0).max(1),
+    clippingRatio: z.number().min(0).max(1),
+    speakingSegments: z.number().int().min(0).max(5000),
+    estimatedWpm: z.number().int().min(0).max(500)
+  })
+  .strict();
+
 export const brainDumpEvaluateRequestSchema = z
   .object({
     courseId: z.string().uuid(),
@@ -49,7 +60,8 @@ export const speechRubricEvaluateRequestSchema = z
     courseId: optionalCourseIdSchema,
     title: optionalTitleSchema,
     transcript: transcriptSchema,
-    durationSeconds: optionalDurationSecondsSchema
+    durationSeconds: optionalDurationSecondsSchema,
+    audioMetrics: speechAudioMetricsSchema.optional()
   });
 
 export const speechRubricEvaluateResponseSchema = z
@@ -63,3 +75,4 @@ export const speechRubricEvaluateResponseSchema = z
 export type BrainDumpEvaluateRequest = z.infer<typeof brainDumpEvaluateRequestSchema>;
 export type SpeechRubricEvaluateRequest = z.infer<typeof speechRubricEvaluateRequestSchema>;
 export type SpeechRubricEvaluateResponse = z.infer<typeof speechRubricEvaluateResponseSchema>;
+export type SpeechAudioMetrics = z.infer<typeof speechAudioMetricsSchema>;

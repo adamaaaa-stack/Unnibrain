@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { SpeechRubricEvaluateResponse } from "@/schemas/api/voice";
+import type { SpeechAudioMetrics, SpeechRubricEvaluateResponse } from "@/schemas/api/voice";
 import type { SpeechRubricEvaluation } from "@/schemas/ai/voice";
 
 type SpeechRubricSessionPreview = {
@@ -21,14 +21,35 @@ type SpeechRubricModeProps = {
   initialSessions: SpeechRubricSessionPreview[];
 };
 
+type CapturedAudioMetrics = Omit<SpeechAudioMetrics, "estimatedWpm">;
+
+type AudioStats = {
+  frames: number;
+  sumRms: number;
+  peakRms: number;
+  silentFrames: number;
+  clippedFrames: number;
+  speakingSegments: number;
+  wasSpeaking: boolean;
+};
+
+const SILENCE_RMS_THRESHOLD = 0.012;
+const CLIP_SAMPLE_THRESHOLD = 0.98;
+
 export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: SpeechRubricModeProps) {
   const recognitionRef = useRef<any>(null);
   const recordingStartedAtRef = useRef<number | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const audioStatsRef = useRef<AudioStats | null>(null);
   const [supportsSpeech, setSupportsSpeech] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [title, setTitle] = useState(courseTitle);
   const [transcript, setTranscript] = useState("");
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
+  const [capturedAudioMetrics, setCapturedAudioMetrics] = useState<CapturedAudioMetrics | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [evaluation, setEvaluation] = useState<SpeechRubricEvaluation | null>(null);
@@ -41,6 +62,136 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
     const elapsedSeconds = Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000));
     setDurationSeconds(elapsedSeconds);
     recordingStartedAtRef.current = null;
+  }
+
+  function resetAudioCapture() {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    analyserRef.current = null;
+
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+  }
+
+  function finalizeAudioMetrics() {
+    const stats = audioStatsRef.current;
+    if (!stats || stats.frames <= 0) {
+      audioStatsRef.current = null;
+      return;
+    }
+
+    setCapturedAudioMetrics({
+      avgRms: Number((stats.sumRms / stats.frames).toFixed(4)),
+      peakRms: Number(stats.peakRms.toFixed(4)),
+      silenceRatio: Number((stats.silentFrames / stats.frames).toFixed(4)),
+      clippingRatio: Number((stats.clippedFrames / stats.frames).toFixed(4)),
+      speakingSegments: stats.speakingSegments
+    });
+    audioStatsRef.current = null;
+  }
+
+  function stopAudioAnalysis() {
+    finalizeAudioMetrics();
+    resetAudioCapture();
+  }
+
+  async function startAudioAnalysis() {
+    if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      return false;
+    }
+
+    resetAudioCapture();
+    audioStatsRef.current = {
+      frames: 0,
+      sumRms: 0,
+      peakRms: 0,
+      silentFrames: 0,
+      clippedFrames: 0,
+      speakingSegments: 0,
+      wasSpeaking: false
+    };
+    setCapturedAudioMetrics(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+
+      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextCtor) {
+        stream.getTracks().forEach((track) => track.stop());
+        return false;
+      }
+
+      const audioContext = new AudioContextCtor();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.15;
+      source.connect(analyser);
+
+      mediaStreamRef.current = stream;
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      const sampleBuffer = new Float32Array(analyser.fftSize);
+      const tick = () => {
+        const currentAnalyser = analyserRef.current;
+        const stats = audioStatsRef.current;
+        if (!currentAnalyser || !stats) {
+          return;
+        }
+
+        currentAnalyser.getFloatTimeDomainData(sampleBuffer);
+        let sumSquares = 0;
+        let clippedCount = 0;
+        for (let i = 0; i < sampleBuffer.length; i += 1) {
+          const sample = sampleBuffer[i];
+          sumSquares += sample * sample;
+          if (Math.abs(sample) >= CLIP_SAMPLE_THRESHOLD) {
+            clippedCount += 1;
+          }
+        }
+
+        const rms = Math.sqrt(sumSquares / sampleBuffer.length);
+        stats.frames += 1;
+        stats.sumRms += rms;
+        stats.peakRms = Math.max(stats.peakRms, rms);
+        const isSpeaking = rms >= SILENCE_RMS_THRESHOLD;
+        if (!isSpeaking) {
+          stats.silentFrames += 1;
+        }
+        if (isSpeaking && !stats.wasSpeaking) {
+          stats.speakingSegments += 1;
+        }
+        stats.wasSpeaking = isSpeaking;
+        if (clippedCount / sampleBuffer.length >= 0.02) {
+          stats.clippedFrames += 1;
+        }
+
+        animationFrameRef.current = requestAnimationFrame(tick);
+      };
+
+      animationFrameRef.current = requestAnimationFrame(tick);
+      return true;
+    } catch {
+      resetAudioCapture();
+      audioStatsRef.current = null;
+      return false;
+    }
   }
 
   useEffect(() => {
@@ -68,27 +219,37 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
     recognition.onend = () => {
       setIsRecording(false);
       finalizeDuration();
+      stopAudioAnalysis();
     };
 
     recognition.onerror = () => {
       setIsRecording(false);
       finalizeDuration();
+      stopAudioAnalysis();
       setError("Speech capture failed. You can paste/type transcript manually.");
     };
 
     recognitionRef.current = recognition;
     return () => {
       recognition.stop();
+      stopAudioAnalysis();
       recognitionRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function startRecording() {
+  async function startRecording() {
     setError(null);
     if (!recognitionRef.current) {
       setError("Speech recognition is not available in this browser.");
       return;
     }
+
+    const analysisReady = await startAudioAnalysis();
+    if (!analysisReady) {
+      setError("Recording started, but mic signal analysis is unavailable in this browser.");
+    }
+
     recordingStartedAtRef.current = Date.now();
     setDurationSeconds(null);
     recognitionRef.current.start();
@@ -97,6 +258,7 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
 
   function stopRecording() {
     recognitionRef.current?.stop();
+    stopAudioAnalysis();
     setIsRecording(false);
     finalizeDuration();
   }
@@ -113,6 +275,16 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
     }
 
     const safeTranscript = normalizedTranscript.slice(0, 50000);
+    const estimatedWpm =
+      durationSeconds && durationSeconds > 0
+        ? Math.max(0, Math.min(500, Math.round((safeTranscript.split(/\s+/).filter(Boolean).length / durationSeconds) * 60)))
+        : 0;
+    const audioMetrics: SpeechAudioMetrics | undefined = capturedAudioMetrics
+      ? {
+          ...capturedAudioMetrics,
+          estimatedWpm
+        }
+      : undefined;
 
     setError(null);
     setIsSubmitting(true);
@@ -126,7 +298,8 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
           courseId,
           title: title.trim() || undefined,
           transcript: safeTranscript,
-          durationSeconds: durationSeconds ?? undefined
+          durationSeconds: durationSeconds ?? undefined,
+          audioMetrics
         })
       });
 
@@ -212,6 +385,7 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
           )}
           {isRecording ? <span className="text-xs font-semibold text-red-600">Recording...</span> : null}
           {durationSeconds ? <span className="text-xs font-semibold text-slate-600">Duration: ~{durationSeconds}s</span> : null}
+          {capturedAudioMetrics ? <span className="text-xs font-semibold text-emerald-700">Audio metrics captured</span> : null}
         </div>
 
         <label className="block text-sm font-medium text-slate-700">
@@ -236,6 +410,7 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
             onClick={() => {
               setTranscript("");
               setDurationSeconds(null);
+              setCapturedAudioMetrics(null);
             }}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
           >
