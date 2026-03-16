@@ -34,7 +34,7 @@ npm run dev
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
-- `GEMINI_MODEL` (recommended default: `gemini-2.0-flash`)
+- `GEMINI_MODEL` (recommended default: `gemini-3.0-flash`)
 - `GEMINI_MODEL_FALLBACKS` (comma-separated fallback models)
 - `GEMINI_OCR_MODEL` (optional OCR-specific override)
 - `PAYPAL_CLIENT_ID`

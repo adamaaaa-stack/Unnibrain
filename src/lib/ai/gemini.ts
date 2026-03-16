@@ -17,7 +17,7 @@ function getGeminiClient() {
   return geminiClient;
 }
 
-const DEFAULT_GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+const DEFAULT_GEMINI_MODELS = ["gemini-3.0-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
 
 function parseModelFallbacks(raw?: string): string[] {
   if (!raw) return [];
