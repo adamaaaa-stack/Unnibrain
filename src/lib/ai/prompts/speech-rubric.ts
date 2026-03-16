@@ -39,6 +39,10 @@ Rules:
 - Be honest about uncertainty when only transcript text is available.
 - When AUDIO METRICS are available, use them for volume control, pause balance, and pace consistency.
 - Do not claim accent/pronunciation details because raw audio is not provided.
+- Do not estimate confidence from wording alone.
+- Confidence must be treated as delivery confidence:
+  - if AUDIO METRICS exist, score using those metrics plus transcript fluency;
+  - if AUDIO METRICS are unavailable, set confidence score to 50 and state it is unavailable from transcript-only data.
 - Use transcript evidence for every score rationale.
 - Keep suggestions concrete and actionable.
 - Count filler words from transcript tokens (for example: "um", "uh", "like", "you know", "so", "basically") when used as fillers.

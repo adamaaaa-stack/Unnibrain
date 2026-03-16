@@ -345,8 +345,8 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
         <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-slate-700">
           <li>Pick a clear topic or exam answer.</li>
           <li>Deliver your explanation out loud without reading.</li>
-          <li>Submit transcript for rubric scoring.</li>
-          <li>Use feedback to improve clarity, structure, and confidence.</li>
+          <li>Submit transcript plus mic metrics for rubric scoring.</li>
+          <li>Use feedback to improve clarity, structure, and delivery confidence.</li>
         </ol>
       </div>
 
@@ -442,7 +442,7 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
               <p className="mt-2 text-sm text-slate-700">{evaluation.structure.rationale}</p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold uppercase text-slate-500">Confidence</p>
+              <p className="text-xs font-semibold uppercase text-slate-500">Delivery Confidence</p>
               <p className="mt-1 text-xl font-semibold text-slate-900">{evaluation.confidence.score}/100</p>
               <p className="mt-2 text-sm text-slate-700">{evaluation.confidence.rationale}</p>
             </div>

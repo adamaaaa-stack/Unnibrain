@@ -5,11 +5,73 @@ import { buildSourceContext } from "@/lib/ai/pipeline/chunking";
 import { getEntitlementsForUser, requireFeature } from "@/lib/billing/entitlements";
 import { badRequest, forbidden, ok, unauthorized } from "@/lib/http/responses";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { speechRubricEvaluateRequestSchema, speechRubricEvaluateResponseSchema } from "@/schemas/api/voice";
+import { type SpeechAudioMetrics, speechRubricEvaluateRequestSchema, speechRubricEvaluateResponseSchema } from "@/schemas/api/voice";
 import { speechRubricEvaluationSchema } from "@/schemas/ai/voice";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function bandScore(value: number, idealMin: number, idealMax: number, hardMin: number, hardMax: number) {
+  if (value <= hardMin || value >= hardMax) {
+    return 0;
+  }
+  if (value >= idealMin && value <= idealMax) {
+    return 100;
+  }
+  if (value < idealMin) {
+    return ((value - hardMin) / (idealMin - hardMin)) * 100;
+  }
+  return ((hardMax - value) / (hardMax - idealMax)) * 100;
+}
+
+function buildAudioInformedConfidence(params: {
+  audioMetrics?: SpeechAudioMetrics;
+  durationSeconds?: number;
+  modelScore: number;
+}): { score: number; rationale: string; confidenceNote: string } {
+  const metrics = params.audioMetrics;
+  if (!metrics) {
+    return {
+      score: 50,
+      rationale: "Confidence is unavailable from transcript-only data. Record with microphone enabled for delivery confidence scoring.",
+      confidenceNote:
+        "Confidence score is fixed at 50 because no audio metrics were provided. Transcript text alone cannot reliably measure delivery confidence."
+    };
+  }
+
+  const volumeScore = bandScore(metrics.avgRms, 0.03, 0.11, 0.008, 0.2);
+  const peakPresenceScore = bandScore(metrics.peakRms, 0.07, 0.22, 0.02, 0.45);
+  const pauseBalanceScore = bandScore(metrics.silenceRatio, 0.12, 0.38, 0.03, 0.7);
+  const clippingControlScore = clamp(100 - metrics.clippingRatio * 900, 0, 100);
+  const paceScore = metrics.estimatedWpm > 0 ? bandScore(metrics.estimatedWpm, 105, 180, 70, 240) : 55;
+  const segmentRate =
+    params.durationSeconds && params.durationSeconds > 0
+      ? metrics.speakingSegments / (params.durationSeconds / 60)
+      : metrics.speakingSegments;
+  const segmentStabilityScore = bandScore(segmentRate, 20, 90, 4, 180);
+
+  const heuristic = Math.round(
+    volumeScore * 0.22 +
+      peakPresenceScore * 0.12 +
+      pauseBalanceScore * 0.2 +
+      clippingControlScore * 0.16 +
+      paceScore * 0.18 +
+      segmentStabilityScore * 0.12
+  );
+  const blended = Math.round(heuristic * 0.8 + params.modelScore * 0.2);
+  const score = clamp(blended, 0, 100);
+
+  return {
+    score,
+    rationale: `Audio-informed confidence from loudness ${metrics.avgRms.toFixed(3)}, pauses ${(metrics.silenceRatio * 100).toFixed(1)}%, clipping ${(metrics.clippingRatio * 100).toFixed(1)}%, and pace ${metrics.estimatedWpm} WPM.`,
+    confidenceNote:
+      "Confidence is audio-informed (not transcript-only). This reflects delivery steadiness and vocal control proxies, not accent/pronunciation grading."
+  };
+}
 
 export async function POST(request: Request) {
   const { user, supabase } = await getRouteUser();
@@ -86,6 +148,14 @@ export async function POST(request: Request) {
       temperature: 0.2,
       maxRetries: 2
     });
+    const confidence = buildAudioInformedConfidence({
+      audioMetrics: parsed.data.audioMetrics,
+      durationSeconds: parsed.data.durationSeconds,
+      modelScore: evaluation.confidence.score
+    });
+    evaluation.confidence.score = confidence.score;
+    evaluation.confidence.rationale = confidence.rationale;
+    evaluation.confidenceNote = confidence.confidenceNote;
 
     const admin = createSupabaseAdminClient();
     const feedback = [
