@@ -27,7 +27,10 @@ export async function POST(request: Request) {
   const json = await request.json().catch(() => null);
   const parsed = speechRubricEvaluateRequestSchema.safeParse(json);
   if (!parsed.success) {
-    return badRequest("Invalid Speech Rubric payload.");
+    const firstIssue = parsed.error.issues[0];
+    const issuePath = firstIssue?.path?.join(".") || "payload";
+    const issueMessage = firstIssue?.message || "Invalid payload.";
+    return badRequest(`Invalid Speech Rubric payload: ${issuePath} ${issueMessage}`);
   }
 
   let courseId: string | null = null;

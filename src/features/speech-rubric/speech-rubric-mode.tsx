@@ -102,10 +102,17 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
   }
 
   async function evaluateSpeech() {
-    if (!transcript.trim()) {
+    const normalizedTranscript = transcript.trim();
+    if (!normalizedTranscript) {
       setError("Transcript is required.");
       return;
     }
+    if (normalizedTranscript.length < 20) {
+      setError("Transcript is too short. Provide at least 20 characters.");
+      return;
+    }
+
+    const safeTranscript = normalizedTranscript.slice(0, 50000);
 
     setError(null);
     setIsSubmitting(true);
@@ -118,7 +125,7 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
         body: JSON.stringify({
           courseId,
           title: title.trim() || undefined,
-          transcript,
+          transcript: safeTranscript,
           durationSeconds: durationSeconds ?? undefined
         })
       });
@@ -220,7 +227,7 @@ export function SpeechRubricMode({ courseId, courseTitle, initialSessions }: Spe
         <div className="flex flex-wrap gap-2">
           <button
             onClick={evaluateSpeech}
-            disabled={isSubmitting || !transcript.trim()}
+            disabled={isSubmitting || transcript.trim().length < 20}
             className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {isSubmitting ? "Evaluating..." : "Evaluate Speech"}

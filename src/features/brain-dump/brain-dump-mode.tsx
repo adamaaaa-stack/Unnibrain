@@ -86,10 +86,17 @@ export function BrainDumpMode({ courseId, initialSessions }: BrainDumpModeProps)
   }
 
   async function evaluateTranscript() {
-    if (!transcript.trim()) {
+    const normalizedTranscript = transcript.trim();
+    if (!normalizedTranscript) {
       setError("Transcript is required.");
       return;
     }
+    if (normalizedTranscript.length < 20) {
+      setError("Transcript is too short. Provide at least 20 characters.");
+      return;
+    }
+
+    const safeTranscript = normalizedTranscript.slice(0, 50000);
 
     setError(null);
     setIsSubmitting(true);
@@ -101,7 +108,7 @@ export function BrainDumpMode({ courseId, initialSessions }: BrainDumpModeProps)
         },
         body: JSON.stringify({
           courseId,
-          transcript
+          transcript: safeTranscript
         })
       });
 
@@ -183,7 +190,7 @@ export function BrainDumpMode({ courseId, initialSessions }: BrainDumpModeProps)
         <div className="flex flex-wrap gap-2">
           <button
             onClick={evaluateTranscript}
-            disabled={isSubmitting || !transcript.trim()}
+            disabled={isSubmitting || transcript.trim().length < 20}
             className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {isSubmitting ? "Evaluating..." : "Evaluate Brain Dump"}

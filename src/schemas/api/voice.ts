@@ -1,21 +1,56 @@
 import { z } from "zod";
 import { speechRubricEvaluationSchema } from "@/schemas/ai/voice";
 
+const transcriptSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim() : value),
+  z.string().min(20).max(50_000)
+);
+
+const optionalCourseIdSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  },
+  z.string().uuid().optional()
+);
+
+const optionalTitleSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  },
+  z.string().max(160).optional()
+);
+
+const optionalDurationSecondsSchema = z.preprocess(
+  (value) => {
+    if (value == null) return undefined;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return undefined;
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : value;
+    }
+    return value;
+  },
+  z.number().int().min(1).max(3600).optional()
+);
+
 export const brainDumpEvaluateRequestSchema = z
   .object({
     courseId: z.string().uuid(),
-    transcript: z.string().min(20).max(10000)
-  })
-  .strict();
+    transcript: transcriptSchema
+  });
 
 export const speechRubricEvaluateRequestSchema = z
   .object({
-    courseId: z.string().uuid().optional(),
-    title: z.string().max(160).optional(),
-    transcript: z.string().min(20).max(10000),
-    durationSeconds: z.number().int().min(1).max(3600).optional()
-  })
-  .strict();
+    courseId: optionalCourseIdSchema,
+    title: optionalTitleSchema,
+    transcript: transcriptSchema,
+    durationSeconds: optionalDurationSecondsSchema
+  });
 
 export const speechRubricEvaluateResponseSchema = z
   .object({
