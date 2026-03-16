@@ -34,6 +34,9 @@ npm run dev
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
+- `GEMINI_MODEL` (recommended default: `gemini-2.0-flash`)
+- `GEMINI_MODEL_FALLBACKS` (comma-separated fallback models)
+- `GEMINI_OCR_MODEL` (optional OCR-specific override)
 - `PAYPAL_CLIENT_ID`
 - `PAYPAL_CLIENT_SECRET`
 - `PAYPAL_WEBHOOK_ID`
@@ -64,3 +67,12 @@ https://<your-domain>/api/webhooks/paypal
 - File upload limits are capped to Vercel-friendly limits:
   - max per file: `4MB`
   - max total upload payload: `4MB`
+
+## Gemini model troubleshooting
+
+If generation fails with a model-not-found error, update:
+
+- `GEMINI_MODEL` to a model available in your Google AI account/region.
+- `GEMINI_MODEL_FALLBACKS` to include additional valid models.
+
+The app will automatically try the primary model first, then fallbacks.
